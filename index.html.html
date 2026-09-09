@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Presencia">
+<title>Control de Presencia</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#172033;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{max-width:720px;margin:auto;padding:14px 12px 40px}.card{background:#fff;border-radius:18px;padding:17px;margin-bottom:12px;box-shadow:0 2px 10px #0001}h1{font-size:23px;margin:0 0 3px}.muted{color:#687386;font-size:14px}.stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px}.stat{text-align:center;background:#f8f9fb;border-radius:14px;padding:10px}.num{font-size:26px;font-weight:750}.lbl{font-size:12px;color:#687386}.progress{height:8px;background:#e5e8ed;border-radius:99px;margin-top:12px;overflow:hidden}.bar{height:100%;width:0;background:#1f6feb}.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.btn{border:0;border-radius:12px;padding:12px 9px;font-size:14px;font-weight:700;cursor:pointer}.primary{background:#1f6feb;color:white}.secondary{background:white;color:#1f6feb;border:1px solid #dce2eb}.item{display:flex;gap:11px;align-items:center;padding:12px 4px;border-bottom:1px solid #edf0f4}.item:last-child{border:0}.check{width:27px;height:27px;border:2px solid #b8c1ce;border-radius:8px;background:white;flex:none;font-size:17px;color:white;cursor:pointer}.check.on{background:#1f6feb;border-color:#1f6feb}.name{flex:1;font-size:15px}.time{font-size:11px;color:#788394;margin-top:2px}.report{white-space:pre-wrap;background:#f7f8fa;border-radius:11px;padding:12px;font-size:14px;line-height:1.45}.modal{position:fixed;inset:0;background:#0007;display:none;align-items:flex-end;justify-content:center}.modalbox{background:white;width:100%;max-width:720px;border-radius:20px 20px 0 0;padding:18px;max-height:88vh;overflow:auto}.edit{display:flex;gap:7px;margin:8px 0}.edit input{flex:1;padding:11px;border:1px solid #d8dee8;border-radius:10px;font-size:14px}.x{border:0;background:#f0f2f5;border-radius:10px;width:40px}.foot{display:flex;gap:8px;margin-top:12px}.foot .btn{flex:1}.note{font-size:12px;color:#697588;line-height:1.4;margin-top:9px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card"><h1>🏢 Control de presencia</h1><div class="muted">Punto de Atención</div><div id="date" class="muted" style="margin-top:10px"></div>
+<div class="stats"><div class="stat"><div id="present" class="num">0</div><div class="lbl">Presentes</div></div><div class="stat"><div id="pending" class="num">0</div><div class="lbl">Pendientes</div></div></div><div class="progress"><div id="bar" class="bar"></div></div></div>
+<div class="card actions"><button class="btn primary" onclick="copyReport()">📋 Copiar reporte</button><button class="btn secondary" onclick="shareReport()">📤 Compartir</button><button class="btn secondary" onclick="newDay()">🔄 Nueva jornada</button><button class="btn secondary" onclick="openAdmin()">⚙️ Administrar entidades</button></div>
+<div class="card" id="list"></div>
+<div class="card"><div class="muted" style="font-weight:700;margin-bottom:8px">📋 Mensaje para compartir</div><div id="report" class="report"></div></div>
+</div>
+<div id="modal" class="modal"><div class="modalbox"><h2>⚙️ Administrar entidades</h2><div id="editList"></div><button class="btn secondary" style="width:100%;margin-top:5px" onclick="addEntity()">＋ Agregar entidad</button><div class="note">Los cambios de nombres se guardan en este teléfono. Si otro compañero usa otro teléfono, deberá hacer el mismo cambio allí.</div><div class="foot"><button class="btn secondary" onclick="closeAdmin()">Cancelar</button><button class="btn primary" onclick="saveEntities()">Guardar cambios</button></div></div></div>
+<script>
+const DEFAULT=[
+"COLPENSIONES","POSITIVA","AGENCIA ATENEA","CAPITAL SALUD","GOBIERNO – MOD 20","GOBIERNO – INSPECCIÓN DE POLICÍA","SECRETARÍA DISTRITAL DE SEGURIDAD, CONVIVENCIA Y JUSTICIA","CATASTRO DISTRITAL","AMBIENTE – SDA","IDU – INSTITUTO DE DESARROLLO URBANO","SALUD – SDS","HACIENDA – SDH","PLANEACIÓN – SISBÉN","PLANEACIÓN – NORMA URBANA","DIAN – DIRECCIÓN DE IMPUESTOS Y ADUANAS NACIONALES","INTEGRACIÓN SOCIAL – SDIS","REGISTRADURÍA AUXILIAR DE BOSA","ACUEDUCTO – EAAB ESP","VANTI","ENEL COLOMBIA S.A. ESP – CODENSA","IDRD – INSTITUTO DISTRITAL DE RECREACIÓN Y DEPORTE","SECRETARÍA DISTRITAL DEL HÁBITAT","FNA – FONDO NACIONAL DEL AHORRO","LIME – LIMPIEZA METROPOLITANA S.A. ESP","EDUCACIÓN – SDE","DEPARTAMENTO ADMINISTRATIVO PARA LA PROSPERIDAD SOCIAL","PERSONERÍA – REQUERIMIENTOS","PERSONERÍA – CONCILIACIÓN","UNIVERSIDAD MILITAR NUEVA GRANADA – CONSULTORÍA JURÍDICA","REVAL S.A.S."
+];
+const ENTKEY="control_entidades_v2",DAYKEY="control_jornada_v2_"+new Date().toISOString().slice(0,10);
+let entities=JSON.parse(localStorage.getItem(ENTKEY)||"null")||DEFAULT.slice();
+let state=JSON.parse(localStorage.getItem(DAYKEY)||"{}"),editing=[];
+document.getElementById("date").textContent=new Date().toLocaleDateString("es-CO",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+function render(){let l=document.getElementById("list");l.innerHTML="";entities.forEach((n,i)=>{let on=!!state[i],r=document.createElement("div");r.className="item";r.innerHTML='<button class="check '+(on?"on":"")+'" onclick="toggle('+i+')">'+(on?"✓":"")+'</button><div class="name">'+esc(n)+(on?'<div class="time">Llegada: '+new Date(state[i]).toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})+"</div>":"")+"</div>";l.appendChild(r)});let p=Object.keys(state).length;document.getElementById("present").textContent=p;document.getElementById("pending").textContent=entities.length-p;document.getElementById("bar").style.width=(entities.length?p/entities.length*100:0)+"%";document.getElementById("report").textContent=makeReport()}
+function toggle(i){if(state[i])delete state[i];else state[i]=new Date().toISOString();localStorage.setItem(DAYKEY,JSON.stringify(state));render()}
+function makeReport(){let pending=entities.filter((_,i)=>!state[i]),p=entities.length-pending.length,s="📋 CONTROL DE PRESENCIA – PUNTO DE ATENCIÓN\n\n📅 "+new Date().toLocaleDateString("es-CO",{weekday:"long",year:"numeric",month:"long",day:"numeric"})+"\n\n🟢 Presentes: "+p+"/"+entities.length+"\n🔴 Pendientes: "+pending.length+"\n";return s+(pending.length?"\n🔴 ENTIDADES PENDIENTES DE LLEGADA:\n"+pending.map(x=>"• "+x).join("\n"):"\n✅ Todas las entidades han hecho presencia.")}
+async function copyReport(){let t=makeReport();try{await navigator.clipboard.writeText(t);alert("Reporte copiado")}catch(e){let x=document.createElement("textarea");x.value=t;document.body.appendChild(x);x.select();document.execCommand("copy");x.remove();alert("Reporte copiado")}}
+async function shareReport(){let t=makeReport();if(navigator.share){try{await navigator.share({title:"Control de presencia",text:t})}catch(e){}}else copyReport()}
+function newDay(){if(confirm("¿Iniciar una nueva jornada? Se borrarán solamente las marcas de hoy en este teléfono.")){state={};localStorage.removeItem(DAYKEY);render()}}
+function openAdmin(){editing=entities.slice();drawEditor();document.getElementById("modal").style.display="flex"}
+function closeAdmin(){document.getElementById("modal").style.display="none"}
+function drawEditor(){let b=document.getElementById("editList");b.innerHTML="";editing.forEach((x,i)=>{let r=document.createElement("div");r.className="edit";r.innerHTML='<input value="'+esc(x)+'" oninput="editing['+i+']=this.value"><button class="x" onclick="editing.splice('+i+',1);drawEditor()">🗑️</button>';b.appendChild(r)})}
+function addEntity(){editing.push("NUEVA ENTIDAD");drawEditor()}
+function saveEntities(){editing=editing.map(x=>x.trim()).filter(Boolean);if(!editing.length)return alert("Debe existir al menos una entidad.");entities=editing.slice();localStorage.setItem(ENTKEY,JSON.stringify(entities));state={};localStorage.removeItem(DAYKEY);closeAdmin();render();alert("Entidades actualizadas")}
+function esc(s){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+render();
+</script>
+</body>
+</html>
