@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Presencia">
+<link rel="manifest" href="manifest.json">
+<title>Control de Presencia</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f4f6f8}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:720px;margin:auto;padding:16px 14px 36px}
+header{background:white;border-radius:18px;padding:18px;box-shadow:0 2px 10px #0000000d;margin-bottom:14px}
+h1{font-size:23px;margin:0 0 4px}.sub{color:#687386;font-size:14px}
+.date{margin-top:12px;font-size:14px;color:#44506a}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.stat{background:#fff;border-radius:15px;padding:13px;text-align:center}.num{font-size:26px;font-weight:750}.label{font-size:12px;color:#687386}
+.progress{height:9px;background:#e6e9ee;border-radius:99px;overflow:hidden;margin-top:13px}.bar{height:100%;background:#1f6feb;width:0}
+.controls{display:flex;gap:9px;margin:12px 0}.btn{border:0;border-radius:12px;padding:12px 14px;font-weight:650;cursor:pointer;font-size:14px}.primary{background:#1f6feb;color:white}.secondary{background:#fff;color:#1f6feb;border:1px solid #dce2eb}
+.list{background:white;border-radius:16px;overflow:hidden;box-shadow:0 2px 10px #0000000a}
+.item{display:flex;align-items:center;gap:12px;padding:13px 14px;border-bottom:1px solid #edf0f4}.item:last-child{border-bottom:0}
+.check{width:25px;height:25px;border:2px solid #b8c1ce;border-radius:8px;background:white;display:grid;place-items:center;flex:0 0 auto;cursor:pointer}.check.on{background:#1f6feb;border-color:#1f6feb;color:white}.name{font-size:15px;flex:1}.time{font-size:11px;color:#7a8595;margin-top:3px}
+.report{background:white;border-radius:16px;padding:15px;margin-top:14px;box-shadow:0 2px 10px #0000000a}.report h2{font-size:17px;margin:0 0 10px}.msg{white-space:pre-wrap;background:#f7f8fa;border-radius:11px;padding:12px;font-size:14px;line-height:1.45;max-height:310px;overflow:auto}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#172033;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;display:none}
+.small{font-size:12px;color:#6b7585;margin-top:9px;line-height:1.4}
+@media (prefers-color-scheme: dark){:root{background:#101318;color:#eef2f7}header,.stat,.list,.report{background:#191e26}.sub,.label,.date,.small,.time{color:#aab4c2}.item{border-color:#2a313d}.secondary{background:#191e26;color:#70a7ff;border-color:#384251}.msg{background:#12161c}.progress{background:#303744}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>🏢 Control de presencia</h1>
+<div class="sub">Punto de Atención</div>
+<div class="date" id="date"></div>
+<div class="stats">
+<div class="stat"><div class="num" id="present">0</div><div class="label">Presentes</div></div>
+<div class="stat"><div class="num" id="pending">30</div><div class="label">Pendientes</div></div>
+</div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+</header>
+
+<div class="controls">
+<button class="btn primary" onclick="copyMessage()">📋 Copiar reporte</button>
+<button class="btn secondary" onclick="shareMessage()">📤 Compartir</button>
+<button class="btn secondary" onclick="newDay()">🔄 Nueva jornada</button>
+</div>
+
+<div class="list" id="list"></div>
+
+<section class="report">
+<h2>📋 Mensaje para compartir</h2>
+<div class="msg" id="message"></div>
+<div class="small">Puedes copiarlo y pegarlo en WhatsApp. Si tu iPhone ofrece WhatsApp en el menú de compartir, también puedes usar “Compartir”.</div>
+</section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const entities = [
+"COLPENSIONES","POSITIVA","AGENCIA ATENEA","CAPITAL SALUD",
+"GOBIERNO – MOD 20","GOBIERNO – INSPECCIÓN DE POLICÍA",
+"SECRETARÍA DISTRITAL DE SEGURIDAD, CONVIVENCIA Y JUSTICIA",
+"CATASTRO DISTRITAL","AMBIENTE – SDA","IDU – INSTITUTO DE DESARROLLO URBANO",
+"SALUD – SDS","HACIENDA – SDH","PLANEACIÓN – SISBÉN","PLANEACIÓN – NORMA URBANA",
+"DIAN – DIRECCIÓN DE IMPUESTOS Y ADUANAS NACIONALES","INTEGRACIÓN SOCIAL – SDIS",
+"REGISTRADURÍA AUXILIAR DE BOSA","ACUEDUCTO – EAAB ESP","VANTI",
+"ENEL COLOMBIA S.A. ESP – CODENSA","IDRD – INSTITUTO DISTRITAL DE RECREACIÓN Y DEPORTE",
+"SECRETARÍA DISTRITAL DEL HÁBITAT","FNA – FONDO NACIONAL DEL AHORRO",
+"LIME – LIMPIEZA METROPOLITANA S.A. ESP","EDUCACIÓN – SDE",
+"DEPARTAMENTO ADMINISTRATIVO PARA LA PROSPERIDAD SOCIAL",
+"PERSONERÍA – REQUERIMIENTOS","PERSONERÍA – CONCILIACIÓN",
+"UNIVERSIDAD MILITAR NUEVA GRANADA – CONSULTORÍA JURÍDICA","REVAL S.A.S."
+];
+
+const key = "presencia_" + new Date().toISOString().slice(0,10);
+let state = JSON.parse(localStorage.getItem(key) || "{}");
+
+function fmtDate(){
+ const d=new Date(); return d.toLocaleDateString("es-CO",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+}
+document.getElementById("date").textContent=fmtDate();
+
+function render(){
+ const list=document.getElementById("list"); list.innerHTML="";
+ entities.forEach((name,i)=>{
+  const on=!!state[i];
+  const item=document.createElement("div"); item.className="item";
+  item.innerHTML=`<button class="check ${on?"on":""}" aria-label="${on?"Presente":"Pendiente"}" onclick="toggle(${i})">${on?"✓":""}</button><div class="name">${name}${on?`<div class="time">Llegada: ${state[i]}</div>`:""}</div>`;
+  list.appendChild(item);
+ });
+ const present=Object.keys(state).length, pending=entities.length-present;
+ document.getElementById("present").textContent=present;
+ document.getElementById("pending").textContent=pending;
+ document.getElementById("bar").style.width=(present/entities.length*100)+"%";
+ document.getElementById("message").textContent=makeMessage();
+}
+function toggle(i){
+ if(state[i]) delete state[i];
+ else state[i]=new Date().toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"});
+ localStorage.setItem(key,JSON.stringify(state)); render();
+}
+function makeMessage(){
+ const pending=entities.filter((_,i)=>!state[i]);
+ const present=entities.length-pending.length;
+ let s=`📋 CONTROL DE PRESENCIA – PUNTO DE ATENCIÓN\n\n`;
+ s+=`📅 ${fmtDate()}\n\n`;
+ s+=`🟢 Presentes: ${present}/${entities.length}\n`;
+ s+=`🔴 Pendientes: ${pending.length}\n`;
+ if(pending.length){
+  s+=`\n🔴 ENTIDADES PENDIENTES DE LLEGADA:\n`;
+  pending.forEach(x=>s+=`• ${x}\n`);
+ } else s+=`\n✅ Todas las entidades han hecho presencia.`;
+ return s.trim();
+}
+async function copyMessage(){
+ try{await navigator.clipboard.writeText(makeMessage()); toast("Reporte copiado");}
+ catch(e){fallbackCopy(makeMessage());}
+}
+function fallbackCopy(t){const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand("copy");ta.remove();toast("Reporte copiado");}
+async function shareMessage(){
+ const text=makeMessage();
+ if(navigator.share){try{await navigator.share({title:"Control de presencia",text});}catch(e){}}
+ else {fallbackCopy(text); toast("Copiado. Puedes pegarlo en WhatsApp");}
+}
+function newDay(){
+ if(confirm("¿Iniciar una nueva jornada? Se conservará la información de los días anteriores en este dispositivo.")){
+  const d=new Date(); const today=d.toISOString().slice(0,10);
+  localStorage.removeItem("presencia_"+today);
+  state={}; location.reload();
+ }
+}
+function toast(t){const x=document.getElementById("toast");x.textContent=t;x.style.display="block";setTimeout(()=>x.style.display="none",1800)}
+render();
+</script>
+</body>
+</html>
