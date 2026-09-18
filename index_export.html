@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#17324d">
+<title>Control de Presencia</title>
+<link rel="manifest" href="manifest.json">
+<style>
+:root{--p:#17324d;--bg:#f3f6f8;--b:#dbe2e8;--t:#1d2935;--m:#657483;--g:#e8f5ed;--gb:#237a4b;--y:#fff6dc;--yb:#9a6900;--n:#edf0f2;--nb:#66717c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial;color:var(--t)}
+header{background:var(--p);color:#fff;padding:16px;position:sticky;top:0;z-index:5}.head{display:flex;justify-content:space-between;align-items:center;gap:8px}h1{font-size:21px;margin:0}.sub{font-size:12px;opacity:.8;margin-top:4px}
+main{max-width:900px;margin:auto;padding:12px}.panel,.card{background:#fff;border:1px solid var(--b);border-radius:13px;padding:12px;margin-bottom:10px}
+button{font:inherit;border:0;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer}.primary{background:var(--p);color:#fff}.secondary{background:#e8eef3;color:var(--p)}.danger{background:#fde9e7;color:#b3261e}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.field{flex:1;min-width:130px}.field label{display:block;font-size:11px;font-weight:700;color:var(--m);margin-bottom:4px}
+input,textarea,select{width:100%;border:1px solid var(--b);border-radius:8px;padding:9px;background:#fff;color:var(--t)}textarea{min-height:80px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.stat{text-align:center;border:1px solid var(--b);border-radius:10px;padding:8px}.stat b{display:block;font-size:20px}.stat span{font-size:11px;color:var(--m)}.present{background:var(--g)}.pending{background:var(--y)}.na{background:var(--n)}
+.toolbar{display:flex;gap:8px}.toolbar input{flex:1}.hour{font-weight:800;color:var(--p);font-size:15px;margin:15px 3px 7px}
+.entity{background:#fff;border:1px solid var(--b);border-radius:11px;margin-bottom:7px;overflow:hidden}.entity-main{display:grid;grid-template-columns:minmax(0,1fr) minmax(85px,.55fr) auto;gap:8px;align-items:center;padding:10px}.name{font-weight:700;font-size:13px;line-height:1.25}.loc{font-size:11px;color:var(--m);line-height:1.25}
+.status{font-size:10px;padding:7px 6px;border:1px solid;border-radius:8px;white-space:nowrap}.sp{background:var(--g);color:var(--gb);border-color:#a9d4b8}.sy{background:var(--y);color:var(--yb);border-color:#e6ce7a}.sn{background:var(--n);color:var(--nb);border-color:#cbd1d5}
+.arrival{font-size:10px;color:var(--gb);padding:0 10px 8px}.order{display:none;background:#f7f9fa;border-top:1px solid var(--b);padding:6px;gap:5px}.order button{flex:1;padding:6px;background:#fff;border:1px solid var(--b)}.ordering .order{display:flex}
+.preview{white-space:pre-wrap;background:#f7f9fa;border:1px dashed var(--b);padding:10px;border-radius:8px;font-size:13px}.modal{position:fixed;inset:0;background:#0008;z-index:20;display:flex;align-items:flex-end}.modal.hidden{display:none}.box{background:#fff;width:100%;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:15px}.mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.mh h2{margin:0;font-size:19px}.item{border:1px solid var(--b);border-radius:10px;padding:9px;margin-bottom:8px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.note{font-size:12px;color:var(--m);background:#f1f5f7;padding:9px;border-radius:8px;margin-bottom:10px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}.entity-main{grid-template-columns:minmax(0,1fr) minmax(78px,.5fr) auto}.status{font-size:9px;padding:7px 5px}}
+</style>
+</head>
+<body>
+<header><div class="head"><div><h1>Control de Presencia</h1><div class="sub" id="date"></div></div><button class="secondary" onclick="settings()">⚙️ Configurar</button></div></header>
+<main>
+<section class="panel">
+<div class="row"><div class="field"><label>PLANTILLA DEL MENSAJE</label><select id="tpl" onchange="chooseTpl(this.value)"></select></div><button class="secondary" onclick="templates()">Editar plantillas</button></div>
+<div class="stats"><div class="stat present"><b id="pc">0</b><span>Presentes</span></div><div class="stat pending"><b id="qc">0</b><span>Pendientes</span></div><div class="stat na"><b id="nc">0</b><span>No atienden</span></div></div>
+</section>
+<section class="panel"><div class="toolbar"><input id="search" placeholder="🔎 Buscar entidad o ubicación" oninput="render()"><button class="secondary" onclick="toggleOrder()" id="ord">↕ Ordenar</button></div></section>
+<section id="list"></section>
+<section class="panel"><b style="color:var(--p)">Mensaje para compartir</b><div class="preview" id="msg" style="margin-top:8px"></div><div class="row" style="margin-top:8px"><button class="primary" onclick="share()">📤 Compartir</button><button class="secondary" onclick="copy()">📋 Copiar</button></div></section>
+</main>
+<div class="modal hidden" id="modal"><div class="box" id="box"></div></div>
+<script>
+const CK="control_presencia_v3_config",TK="control_presencia_v3_templates",SK="control_presencia_v3_template",DK="control_presencia_v3_day_";
+const defaults=["COLPENSIONES","POSITIVA","AGENCIA ATENEA","CAPITAL SALUD","GOBIERNO – MOD 20","GOBIERNO – INSPECCIÓN DE POLICÍA","SECRETARÍA DISTRITAL DE SEGURIDAD, CONVIVENCIA Y JUSTICIA","CATASTRO DISTRITAL","AMBIENTE – SDA","IDU – INSTITUTO DE DESARROLLO URBANO","SALUD – SDS","HACIENDA – SDH","PLANEACIÓN – SISBÉN","PLANEACIÓN – NORMA URBANA","DIAN – DIRECCIÓN DE IMPUESTOS Y ADUANAS NACIONALES","INTEGRACIÓN SOCIAL – SDIS","REGISTRADURÍA AUXILIAR DE BOSA","ACUEDUCTO – EAAB ESP","VANTI","ENEL COLOMBIA S.A. ESP – CODENSA","IDRD – INSTITUTO DISTRITAL DE RECREACIÓN Y DEPORTE","SECRETARÍA DISTRITAL DEL HÁBITAT","FNA – FONDO NACIONAL DEL AHORRO","LIME – LIMPIEZA METROPOLITANA S.A. ESP","EDUCACIÓN – SDE","DEPARTAMENTO ADMINISTRATIVO PARA LA PROSPERIDAD SOCIAL","PERSONERÍA – REQUERIMIENTOS","PERSONERÍA – CONCILIACIÓN","UNIVERSIDAD MILITAR NUEVA GRANADA – CONSULTORÍA JURÍDICA","REVAL S.A.S."];
+let cfg=JSON.parse(localStorage.getItem(CK)||"null")||defaults.map((name,i)=>({id:"e"+(i+1),name,location:"",time:"08:00",active:true}));
+let tpls=JSON.parse(localStorage.getItem(TK)||"null")||[{id:"t1",name:"Plantilla principal",text:"Buenos días, están pendientes por llegar:"}];
+let day=JSON.parse(localStorage.getItem(DK+today())||"{}"),ordering=false;
+function today(){return new Date().toISOString().slice(0,10)} function save(){localStorage.setItem(CK,JSON.stringify(cfg))} function saveT(){localStorage.setItem(TK,JSON.stringify(tpls))} function st(id){return day[id]?.status||"pending"}
+function setst(id,s){day[id]={status:s,arrival:s==="present"?new Date().toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"}):null};localStorage.setItem(DK+today(),JSON.stringify(day));render()}
+function cycle(id){let s=st(id);setst(id,s==="pending"?"present":s==="present"?"na":"pending")}
+function esc(x){return String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function selected(){return tpls.find(x=>x.id===localStorage.getItem(SK))||tpls[0]}
+function names(){return cfg.filter(e=>e.active&&st(e.id)==="pending").map(e=>e.name)}
+function message(){return [selected()?.text||"",...names().map(x=>"• "+x)].filter(Boolean).join("\n")}
+function render(){
+document.getElementById("date").textContent=new Date().toLocaleDateString("es-CO",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+let q=document.getElementById("search").value.toLowerCase(),a=cfg.filter(e=>e.active&&(e.name+" "+e.location+" "+e.time).toLowerCase().includes(q));
+a.sort((x,y)=>(x.time||"99:99").localeCompare(y.time||"99:99")||cfg.indexOf(x)-cfg.indexOf(y));
+let h="",last=null; for(let e of a){if(e.time!==last){last=e.time;h+=`<div class="hour">🕐 ${esc(e.time||"Sin horario")}</div>`}let s=st(e.id),cl=s==="present"?"sp":s==="na"?"sn":"sy",lab=s==="present"?"✓ PRESENTE":s==="na"?"NO ATIENDE":"PENDIENTE";h+=`<div class="entity"><div class="entity-main"><div class="name">${esc(e.name)}</div><div class="loc">${esc(e.location||"Sin ubicación")}</div><button class="status ${cl}" onclick="cycle('${e.id}')">${lab}</button></div>${s==="present"?`<div class="arrival">Hora de llegada: ${esc(day[e.id].arrival)}</div>`:""}<div class="order"><button onclick="move('${e.id}',-1)">↑ Subir</button><button onclick="move('${e.id}',1)">↓ Bajar</button></div></div>`}
+document.getElementById("list").innerHTML=h||'<div class="panel" style="text-align:center;color:var(--m)">No hay registros.</div>';
+let p=0,n=0,z=0;cfg.filter(e=>e.active).forEach(e=>{let s=st(e.id);if(s==="present")p++;else if(s==="na")z++;else n++});pc.textContent=p;qc.textContent=n;nc.textContent=z;
+tpl.innerHTML=tpls.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join("");tpl.value=selected().id;msg.textContent=message();document.body.classList.toggle("ordering",ordering);
+}
+function chooseTpl(id){localStorage.setItem(SK,id);render()} function toggleOrder(){ordering=!ordering;ord.textContent=ordering?"✓ Terminar":"↕ Ordenar";render()}
+function move(id,d){let e=cfg.find(x=>x.id===id),same=cfg.filter(x=>x.active&&(x.time||"")===(e.time||"")),i=same.indexOf(e),j=i+d;if(j<0||j>=same.length)return;let a=cfg.indexOf(e),b=cfg.indexOf(same[j]);[cfg[a],cfg[b]]=[cfg[b],cfg[a]];save();render()}
+function open(c){box.innerHTML=c;modal.classList.remove("hidden")}function close(){modal.classList.add("hidden")}
+function settings(){open(`<div class="mh"><h2>⚙️ Configuración</h2><button class="secondary" onclick="close()">Cerrar</button></div><div class="note">Esta configuración se guarda solo en este teléfono. Tu compañero puede usar el mismo enlace con una configuración diferente.</div><button class="primary" onclick="entities()">🏢 Entidades, ubicaciones y horarios</button> <button class="secondary" onclick="templates()">💬 Plantillas</button><button class="secondary" onclick="exportConfig()">📦 Exportar configuración</button>`)}
+function entities(){let r=cfg.map(e=>`<div class="item"><div class="grid"><div class="field"><label>ENTIDAD</label><input id="n${e.id}" value="${esc(e.name)}"></div><div class="field"><label>UBICACIÓN / MÓDULO</label><input id="l${e.id}" value="${esc(e.location)}"></div><div class="field"><label>HORA DE ATENCIÓN</label><input id="h${e.id}" type="time" value="${esc(e.time)}"></div><label><input id="a${e.id}" type="checkbox" ${e.active?"checked":""}> Usar esta opción</label></div><div class="row" style="margin-top:7px"><button class="primary" onclick="saveE('${e.id}')">Guardar</button><button class="danger" onclick="delE('${e.id}')">Eliminar</button></div></div>`).join("");open(`<div class="mh"><h2>🏢 Entidades</h2><button class="secondary" onclick="settings()">Atrás</button></div><div class="note">Puedes escribir libremente entidad, ubicación y hora. La ubicación puede ser módulo, sala, piso, ventanilla o cualquier referencia.</div>${r}<button class="primary" onclick="addE()">＋ Agregar entidad</button>`)}
+function saveE(id){let e=cfg.find(x=>x.id===id);e.name=document.getElementById("n"+id).value.trim()||"Nueva entidad";e.location=document.getElementById("l"+id).value.trim();e.time=document.getElementById("h"+id).value;e.active=document.getElementById("a"+id).checked;save();entities();render()}
+function addE(){cfg.push({id:"e"+Date.now(),name:"Nueva entidad",location:"",time:"08:00",active:true});save();entities();render()}
+function delE(id){if(confirm("¿Eliminar esta entidad de este teléfono?")){cfg=cfg.filter(e=>e.id!==id);save();entities();render()}}
+function templates(){let r=tpls.map(t=>`<div class="item"><label>NOMBRE</label><input id="tn${t.id}" value="${esc(t.name)}"><label style="display:block;margin-top:7px">TEXTO</label><textarea id="tt${t.id}">${esc(t.text)}</textarea><div class="row" style="margin-top:7px"><button class="primary" onclick="saveT1('${t.id}')">Guardar</button><button class="danger" onclick="delT('${t.id}')">Eliminar</button></div></div>`).join("");open(`<div class="mh"><h2>💬 Plantillas</h2><button class="secondary" onclick="close()">Cerrar</button></div><div class="note">El mensaje final será únicamente el texto de la plantilla y los nombres de las entidades PENDIENTES.</div>${r}<button class="primary" onclick="addT()">＋ Nueva plantilla</button>`)}
+function saveT1(id){let t=tpls.find(x=>x.id===id);t.name=document.getElementById("tn"+id).value.trim()||"Plantilla";t.text=document.getElementById("tt"+id).value;saveT();render();templates()}
+function addT(){tpls.push({id:"t"+Date.now(),name:"Nueva plantilla",text:""});saveT();templates();render()} function delT(id){if(tpls.length===1)return alert("Debe existir al menos una plantilla.");if(confirm("¿Eliminar plantilla?")){tpls=tpls.filter(x=>x.id!==id);if(localStorage.getItem(SK)===id)localStorage.removeItem(SK);saveT();templates();render()}}
+async function copy(){try{await navigator.clipboard.writeText(message());alert("Mensaje copiado.")}catch(e){alert(message())}} async function share(){if(navigator.share){try{await navigator.share({text:message()})}catch(e){}}else copy()}
+
+function exportConfig(){
+  const data={version:3,exportedAt:new Date().toISOString(),config:cfg,templates:tpls,selectedTemplate:localStorage.getItem(SK)||null};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="control-presencia-configuracion.json"; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  alert("✅ Configuración exportada correctamente. Busca el archivo control-presencia-configuracion.json en Descargas/Archivos.");
+}
+
+modal.onclick=e=>{if(e.target===modal)close()};render();
+</script>
+</body></html>
